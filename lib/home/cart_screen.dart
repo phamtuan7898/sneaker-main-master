@@ -74,11 +74,15 @@ class _CartScreenState extends State<CartScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Giỏ Hàng'),
+        title: const Text(
+          'GIỎ HÀNG',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.blue, Colors.purple],
+              colors: [Colors.white24, Colors.lightBlueAccent.shade700],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -110,8 +114,9 @@ class _CartScreenState extends State<CartScreen> {
                             SizedBox(height: 4),
                             Text('Giá: ${item.price.toString()}',
                                 style: TextStyle(
-                                    fontSize:
-                                        16)), // Ensure item.price is double
+                                    fontSize: 18,
+                                    color: Colors
+                                        .blueAccent)), // Ensure item.price is double
                           ],
                         ),
                         Row(

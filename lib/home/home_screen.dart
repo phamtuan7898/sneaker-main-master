@@ -43,11 +43,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cửa hàng Sneaker'),
+        title: const Text(
+          'TRANG CHỦ',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.blue, Colors.purple],
+              colors: [Colors.white24, Colors.lightBlueAccent.shade700],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -55,7 +59,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
+            icon: const Icon(
+              Icons.search,
+              color: Colors.white,
+            ),
             onPressed: () {
               // Navigate to SearchScreen
               Navigator.push(
@@ -77,7 +84,6 @@ class _HomeScreenState extends State<HomeScreen> {
             return const Center(child: Text('Không có sản phẩm nào.'));
           } else {
             final products = snapshot.data!;
-
             return SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,9 +112,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Text(
         title,
         style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.blueAccent),
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
+        ),
       ),
     );
   }
@@ -118,16 +125,13 @@ class _HomeScreenState extends State<HomeScreen> {
       final price = int.tryParse(p.price.replaceAll(RegExp(r'[^\d]'), ''));
       return price != null && price < 3500000;
     }).toList();
-
     if (promotionsProducts.isEmpty) {
       return Container();
     }
-
     final infiniteList = List.generate(
       1000,
       (index) => promotionsProducts[index % promotionsProducts.length],
     );
-
     return Container(
       height: 200,
       child: PageView.builder(
@@ -162,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black26,
+            color: Colors.black12,
             blurRadius: 10,
             offset: Offset(0, 4),
           ),
@@ -173,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.black54, Colors.transparent],
+            colors: [Colors.black, Colors.transparent],
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
           ),
@@ -190,7 +194,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCategorySection(List<ProductModel> products, String category) {
     final categoryProducts =
         products.where((p) => p.shoeType == category).toList();
-
     if (categoryProducts.isEmpty) {
       return Container(
         height: 200,
@@ -198,7 +201,6 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text('Không có sản phẩm nào trong danh mục này.')),
       );
     }
-
     return Container(
       height: 200,
       child: ListView.builder(
@@ -274,7 +276,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (products.isEmpty) {
       return const Center(child: Text('Không có sản phẩm nổi bật.'));
     }
-
     return Container(
       height: 200,
       child: PageView.builder(
@@ -324,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Text(
                   product.price,
-                  style: TextStyle(color: Colors.blueAccent),
+                  style: TextStyle(color: Colors.black),
                 ),
               ],
             ),

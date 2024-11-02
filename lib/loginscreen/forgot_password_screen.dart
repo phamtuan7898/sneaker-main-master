@@ -9,8 +9,24 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final TextEditingController _emailController = TextEditingController();
   final AuthService _authService = AuthService();
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    _emailController.dispose();
+
+    super.dispose();
+  }
 
   void _forgotPassword() async {
+    final email = _emailController.text;
+    if (email.isEmpty ||
+        !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w]{2,4}').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Vui lòng nhập email hợp lệ')),
+      );
+      return;
+    }
+
     try {
       await _authService.forgotPassword(_emailController.text);
       // Hiển thị thông báo thành công

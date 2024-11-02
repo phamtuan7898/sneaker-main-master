@@ -35,11 +35,15 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tìm kiếm'),
+        title: const Text(
+          'TÌM KIẾM',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.blue, Colors.purple],
+              colors: [Colors.white24, Colors.lightBlueAccent.shade700],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -54,25 +58,26 @@ class _SearchScreenState extends State<SearchScreen> {
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Tìm kiếm...',
-                suffixIcon: IconButton(
-                  icon: Icon(Icons.search),
-                  onPressed: () {
-                    _filterProducts(_searchController.text);
-                  },
+                prefixIcon:
+                    Icon(Icons.search, color: Colors.lightBlueAccent.shade700),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey),
                 ),
+                filled: true,
+                fillColor: Colors.grey[100],
               ),
               onChanged: _filterProducts,
             ),
+            SizedBox(height: 16),
             Expanded(
-              child: _searchController
-                      .text.isNotEmpty // Chỉ hiển thị khi có truy vấn tìm kiếm
+              child: _searchController.text.isNotEmpty
                   ? _filteredProducts.isNotEmpty
                       ? GridView.builder(
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2, // Số cột trong lưới
-                            childAspectRatio:
-                                0.7, // Tỉ lệ chiều rộng/chiều cao của mỗi ô
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.75,
                             crossAxisSpacing: 8.0,
                             mainAxisSpacing: 8.0,
                           ),
@@ -91,16 +96,21 @@ class _SearchScreenState extends State<SearchScreen> {
                               },
                               child: Card(
                                 elevation: 4,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 child: Column(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
                                     Expanded(
-                                      child: Image.network(
-                                        product.image[
-                                            0], // Đường dẫn đến hình ảnh sản phẩm
-                                        fit:
-                                            BoxFit.contain, // Đổ hình ảnh vào ô
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.vertical(
+                                            top: Radius.circular(12)),
+                                        child: Image.network(
+                                          product.image[0],
+                                          fit: BoxFit.contain,
+                                        ),
                                       ),
                                     ),
                                     Padding(
@@ -112,13 +122,18 @@ class _SearchScreenState extends State<SearchScreen> {
                                           Text(
                                             product.productName,
                                             style: TextStyle(
-                                                fontWeight: FontWeight.bold),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
                                           ),
                                           SizedBox(height: 4),
                                           Text(
                                             product.price,
-                                            style:
-                                                TextStyle(color: Colors.grey),
+                                            style: TextStyle(
+                                              color: Colors
+                                                  .lightBlueAccent.shade700,
+                                              fontSize: 14,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -130,9 +145,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           },
                         )
                       : Center(child: Text('Không có sản phẩm nào.'))
-                  : Center(
-                      child: Text(
-                          'Vui lòng nhập từ khóa tìm kiếm.')), // Thông báo nếu không có tìm kiếm
+                  : Center(child: Text('Vui lòng nhập từ khóa tìm kiếm.')),
             ),
           ],
         ),

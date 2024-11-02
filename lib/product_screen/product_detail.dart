@@ -5,15 +5,26 @@ import 'package:sneaker/service/cart_service.dart';
 
 class ProductDetail extends StatelessWidget {
   final ProductModel product;
-
   ProductDetail({required this.product});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(product.productName),
-        backgroundColor: Colors.blueAccent,
+        title: Text(
+          product.productName,
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.white24, Colors.lightBlueAccent.shade700],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         child: Container(
@@ -125,7 +136,7 @@ class ProductDetail extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              elevation: 2, // Adding shadow to chips
+              elevation: 2,
             );
           }).toList(),
         ),
@@ -144,8 +155,7 @@ class ProductDetail extends StatelessWidget {
         SizedBox(height: 8.0),
         Row(
           children: product.color.map((colorHex) {
-            Color color =
-                Color(int.parse(colorHex)); // Convert hex code to Color
+            Color color = Color(int.parse(colorHex));
             return Container(
               width: 30,
               height: 30,
@@ -171,30 +181,42 @@ class ProductDetail extends StatelessWidget {
 
   Widget _buildAddToCartButton(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 10), // Padding for button
-      child: ElevatedButton(
-        onPressed: () {
-          _showQuantityDialog(context);
-        },
-        child: Text(
-          'Thêm vào giỏ hàng',
-          style: TextStyle(color: Colors.white),
+      padding: EdgeInsets.symmetric(vertical: 10),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.white24, Colors.lightBlueAccent.shade700],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          border: Border.all(color: Colors.black, width: 1),
         ),
-        style: ElevatedButton.styleFrom(
-          padding: EdgeInsets.symmetric(vertical: 15),
-          backgroundColor: Colors.blueAccent,
-          textStyle: TextStyle(fontSize: 18),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          minimumSize: Size(double.infinity, 50), // Full-width button
+        child: ElevatedButton(
+          onPressed: () {
+            _showQuantityDialog(context);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor:
+                Colors.transparent, // Ensure the gradient is visible
+            shadowColor: Colors.transparent,
+            padding: EdgeInsets.symmetric(vertical: 15),
+            textStyle: TextStyle(fontSize: 18),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: Text(
+            'Thêm vào giỏ hàng',
+            style: TextStyle(color: Colors.black, fontSize: 16),
+          ),
         ),
       ),
     );
   }
 
   void _showQuantityDialog(BuildContext context) {
-    int quantity = 1; // Default quantity
-
+    int quantity = 1;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -211,8 +233,7 @@ class ProductDetail extends StatelessWidget {
                     onPressed: () {
                       if (quantity > 1) {
                         quantity--;
-                        (context as Element)
-                            .markNeedsBuild(); // Refresh the dialog
+                        (context as Element).markNeedsBuild();
                       }
                     },
                   ),
@@ -224,8 +245,7 @@ class ProductDetail extends StatelessWidget {
                     icon: Icon(Icons.add),
                     onPressed: () {
                       quantity++;
-                      (context as Element)
-                          .markNeedsBuild(); // Refresh the dialog
+                      (context as Element).markNeedsBuild();
                     },
                   ),
                 ],
@@ -246,9 +266,8 @@ class ProductDetail extends StatelessWidget {
                   id: product.id,
                   productName: product.productName,
                   price: product.price,
-                  quantity: quantity, // Use the selected quantity
+                  quantity: quantity,
                 );
-
                 try {
                   await CartService().addCartItem(cartItem);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -257,7 +276,7 @@ class ProductDetail extends StatelessWidget {
                           '${product.productName} đã được thêm vào giỏ hàng!'),
                     ),
                   );
-                  Navigator.of(context).pop(); // Close the dialog
+                  Navigator.of(context).pop();
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

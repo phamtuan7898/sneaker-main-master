@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const multer = require('multer');
+const nodemailer = require('nodemailer');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 5002;
@@ -10,6 +12,7 @@ const upload = multer({ dest: 'uploads/' }); // Specify the uploads folder
 
 app.use(cors());
 app.use(bodyParser.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Connect to MongoDB
 mongoose.connect('mongodb+srv://haydygame:24HqXHnUuyIMvJJo@cluster0.bpo9e.mongodb.net/')
@@ -120,16 +123,33 @@ app.post('/forgot-password', async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (user) {
-      // Implement password reset logic (e.g., sending email)
-      res.json({ message: 'Reset password link has been sent to your email.' });
+      let transporter = nodemailer.createTransport({
+        service: 'Gmail',
+        auth: {
+          user: 'your-email@gmail.com',
+          pass: '123456', // Replace with actual app password
+        },
+      });
+
+      let mailOptions = {
+        from: 'your-email@gmail.com',
+        to: email,
+        subject: 'Password Reset Request',
+        text: 'Click the link to reset your password.',
+        html: `<a href="http://your-app-link/reset-password?email=${email}">Reset Password</a>`
+      };
+
+      await transporter.sendMail(mailOptions);
+      res.json({ message: 'Password reset link sent to your email.' });
     } else {
       res.status(404).json({ message: 'User not found' });
     }
   } catch (error) {
-    console.error('Error handling forgot password:', error);
-    res.status(500).json({ error: 'Error handling forgot password' });
+    console.error('Error processing forgot password:', error);
+    res.status(500).json({ error: 'Error processing forgot password' });
   }
 });
+
 // Get user profile by ID
 app.get('/User/:id', async (req, res) => {
   const { id } = req.params;
@@ -145,7 +165,7 @@ app.get('/User/:id', async (req, res) => {
     res.status(500).json({ error: 'Error fetching user profile' });
   }
 });
-// Update user profile
+// Update user profile 
 app.put('/User/:id', async (req, res) => {
   const { id } = req.params;
   const { username, email, phone, address, img } = req.body;
@@ -167,6 +187,60 @@ app.put('/User/:id', async (req, res) => {
     res.status(500).json({ error: 'Error updating user profile' });
   }
 });
+// Add this route to your existing Express app
+app.put('/User/:userId/change-password', async (req, res) => {
+  const { userId } = req.params;
+  const { oldPassword, newPassword } = req.body;
+
+  try {
+    // Find user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).send('User not found');
+    }
+
+    // Check if the old password matches
+    if (user.password !== oldPassword) {
+      return res.status(401).send('Old password is incorrect');
+    }
+
+    // Update the password
+    user.password = newPassword;
+    await user.save();
+
+    return res.status(200).send('Password updated successfully');
+  } catch (error) {
+    console.error('Error changing password:', error);
+    return res.status(500).send('Internal server error');
+  }
+});
+
+// Delete account route
+app.delete('/User/:id/delete-account', async (req, res) => {
+  const { id } = req.params;
+  const { password } = req.body;
+
+  try {
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if the provided password matches
+    if (user.password !== password) {
+      return res.status(401).json({ message: 'Incorrect password' });
+    }
+
+    // Delete the user from the database
+    await User.findByIdAndDelete(id);
+
+    return res.status(200).json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    return res.status(500).json({ error: 'Error deleting account' });
+  }
+});
+
 
 // Add new product
 app.post('/products', async (req, res) => {

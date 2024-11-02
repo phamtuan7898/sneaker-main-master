@@ -1,30 +1,22 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:sneaker/models/user_model.dart';
+import 'package:sneaker/screen/changepass_screen.dart';
+import 'package:sneaker/screen/edit_profile_screen.dart';
 import 'package:sneaker/service/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileViewScreen extends StatefulWidget {
   final String userId;
-
-  const ProfileScreen({Key? key, required this.userId}) : super(key: key);
+  const ProfileViewScreen({Key? key, required this.userId}) : super(key: key);
 
   @override
-  _ProfileScreenState createState() => _ProfileScreenState();
+  _ProfileViewScreenState createState() => _ProfileViewScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileViewScreenState extends State<ProfileViewScreen> {
   late ApiService apiService;
   UserModel? user;
-  final ImagePicker _picker = ImagePicker();
-  String? absoluteImagePath;
-
-  // TextEditingControllers for each editable field
-  final TextEditingController usernameController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
-  final TextEditingController addressController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
   @override
   void initState() {
@@ -34,240 +26,201 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> fetchUserProfile() async {
-    try {
-      final fetchedUser = await apiService.getUserProfile(widget.userId);
-      if (fetchedUser == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load user profile.')),
-        );
-        return;
-      }
+    final fetchedUser = await apiService.getUserProfile(widget.userId);
+    if (fetchedUser != null) {
       setState(() {
         user = fetchedUser;
-        absoluteImagePath =
-            user?.img != null && user!.img!.isNotEmpty ? user!.img : null;
-
-        // Initialize the controllers with the current user data
-        usernameController.text = user!.username ?? '';
-        emailController.text = user!.email ?? '';
-        phoneController.text = user!.phone ?? '';
-        addressController.text = user!.address ?? '';
       });
-    } catch (error) {
-      print('Error fetching user profile: $error');
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching user profile.')),
+        SnackBar(content: Text('Failed to load user profile.')),
       );
     }
   }
 
-  Future<void> saveProfileChanges() async {
-    try {
-      // Prepare the updated data as a map
-      final updatedData = {
-        'username': usernameController.text,
-        'email': emailController.text,
-        'phone': phoneController.text,
-        'address': addressController.text,
-      };
-
-      // Call the updateUserProfile method with the userId and updatedData
-      final success =
-          await apiService.updateUserProfile(widget.userId, updatedData);
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Profile updated successfully!')),
+  Future<void> confirmDeleteAccount() async {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Delete Account',
+              style: TextStyle(
+                  color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Please enter your password to confirm account deletion:',
+                  style: TextStyle(color: Colors.grey[700])),
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                    labelText: 'Password', border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+            ),
+            TextButton(
+              onPressed: () async {
+                final success = await apiService.deleteAccount(
+                  widget.userId,
+                  _passwordController.text,
+                );
+                Navigator.pop(context);
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Account deleted successfully.')),
+                  );
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    '/login',
+                    (Route<dynamic> route) => false,
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete account.')),
+                  );
+                }
+              },
+              child: Text('Confirm', style: TextStyle(color: Colors.redAccent)),
+            ),
+          ],
         );
-        fetchUserProfile(); // Refresh the user profile
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Failed to update profile. Please try again.')),
-        );
-      }
-    } catch (error) {
-      print('Error updating profile: $error');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('An error occurred while updating your profile.')),
-      );
-    }
+      },
+    );
   }
 
-  Future<void> pickImage() async {
-    try {
-      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-      if (pickedFile != null) {
-        uploadImage(File(pickedFile.path));
-      }
-    } catch (e) {
-      print('Error picking image: $e');
-    }
-  }
-
-  Future<void> uploadImage(File imageFile) async {
-    try {
-      final uploadSuccess =
-          await apiService.uploadProfileImage(widget.userId, imageFile);
-      if (uploadSuccess) {
-        fetchUserProfile(); // Refresh user profile
-      } else {
-        print('Upload failed: $uploadSuccess');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload image: $uploadSuccess')),
-        );
-      }
-    } catch (e) {
-      print('Error occurred while uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to upload image: $e')),
-      );
-    }
-  }
-
-  Future<String> getLocalPath() async {
-    final directory = await getApplicationDocumentsDirectory();
-    return directory.path;
-  }
-
-  Future<String> getAbsoluteImagePath(String relativePath) async {
-    final directory = await getApplicationDocumentsDirectory();
-    return '${directory.path}/uploads/$relativePath';
+  Future<void> signOut() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      '/login',
+      (Route<dynamic> route) => false,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: Text('CÁ NHÂN', style: TextStyle(fontWeight: FontWeight.w600)),
+        centerTitle: true,
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.blue, Colors.purple],
+              colors: [Colors.white24, Colors.lightBlueAccent.shade700],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
           ),
         ),
       ),
-      body: user == null
-          ? Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          FutureBuilder<String?>(
-                            future: getAbsoluteImagePath(user!.img!),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting) {
-                                return CircleAvatar(
-                                  radius: 70,
-                                  child: CircularProgressIndicator(),
-                                );
-                              } else if (snapshot.hasError ||
-                                  snapshot.data == null) {
-                                return CircleAvatar(
-                                  radius: 70,
-                                  backgroundColor: Colors.grey.shade300,
-                                  child: Icon(Icons.person,
-                                      size: 70, color: Colors.white),
-                                );
-                              } else {
-                                final imagePath = snapshot.data!;
-                                final file = File(imagePath);
-                                if (!file.existsSync()) {
-                                  // If the file doesn't exist, show a default avatar
-                                  return CircleAvatar(
-                                    radius: 70,
-                                    backgroundColor: Colors.grey.shade200,
-                                    child: Icon(Icons.person,
-                                        size: 70, color: Colors.white),
-                                  );
-                                }
-                                return CircleAvatar(
-                                  radius: 70,
-                                  backgroundImage: FileImage(file),
-                                  backgroundColor: Colors.grey.shade200,
-                                );
-                              }
-                            },
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: IconButton(
-                              icon: Icon(Icons.edit, color: Colors.white),
-                              onPressed: pickImage,
-                              padding: EdgeInsets.all(8),
-                              constraints: BoxConstraints(),
-                              splashColor: Colors.transparent,
-                              highlightColor: Colors.transparent,
-                              iconSize: 24,
-                              tooltip: 'Change Profile Image',
-                              color: Theme.of(context).primaryColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    Text(
-                      'Edit Profile',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    _buildProfileEditField('Username', usernameController),
-                    SizedBox(height: 10),
-                    _buildProfileEditField('Email', emailController),
-                    SizedBox(height: 10),
-                    _buildProfileEditField('Phone', phoneController),
-                    SizedBox(height: 10),
-                    _buildProfileEditField('Address', addressController),
-                    SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: saveProfileChanges,
-                      child: Text(
-                        'Save Changes',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        textStyle: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ],
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: [
+            if (user != null) ...[
+              CircleAvatar(
+                radius: 60,
+                backgroundImage: user!.img != null && user!.img!.isNotEmpty
+                    ? NetworkImage('${apiService.baseUrl}/${user!.img}')
+                    : null,
+                backgroundColor: Colors.grey[300],
+                child: user!.img == null
+                    ? Icon(Icons.person, size: 60, color: Colors.white)
+                    : null,
+              ),
+              SizedBox(height: 16),
+              Text(
+                user!.username ?? '',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 25,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
+              SizedBox(height: 4),
+              Text(
+                user!.email ?? '',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 20, color: Colors.grey[600]),
+              ),
+              SizedBox(height: 20),
+              Divider(color: Colors.grey[400]),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    'Phone: ${user!.phone ?? ''}',
+                    style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Address: ${user!.address ?? ''}',
+                    style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+              SizedBox(height: 20),
+              Divider(color: Colors.grey[400]),
+            ],
+            ListTile(
+              leading: Icon(Icons.edit),
+              title: Text(
+                'Edit Profile',
+                style: TextStyle(fontSize: 16),
+              ),
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        ProfileEditScreen(userId: widget.userId),
+                  ),
+                );
+                if (result == true) {
+                  fetchUserProfile(); // Refresh the profile data after editing
+                }
+              },
             ),
-    );
-  }
-
-  TextField _buildProfileEditField(
-      String label, TextEditingController controller) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Theme.of(context).primaryColor),
+            Divider(),
+            ListTile(
+              leading: Icon(Icons.lock, color: Colors.amber),
+              title: Text('Change Password', style: TextStyle(fontSize: 16)),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        ChangePasswordScreen(userId: widget.userId),
+                  ),
+                );
+              },
+            ),
+            Divider(),
+            ListTile(
+              leading: Icon(Icons.delete, color: Colors.red),
+              title: Text('Delete Account', style: TextStyle(fontSize: 16)),
+              onTap: confirmDeleteAccount,
+            ),
+            Divider(),
+            ListTile(
+              leading: Icon(Icons.logout, color: Colors.blue),
+              title: Text('Sign Out', style: TextStyle(fontSize: 16)),
+              onTap: signOut,
+            ),
+          ],
         ),
       ),
     );

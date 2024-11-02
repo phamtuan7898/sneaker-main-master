@@ -5,7 +5,6 @@ import 'package:sneaker/home/profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
   final String userId;
-
   const MainScreen({Key? key, required this.userId}) : super(key: key);
 
   @override
@@ -14,8 +13,6 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-
-  // Update the screens list to include the ProfileScreen with userId
   late final List<Widget> _screens;
 
   @override
@@ -24,7 +21,7 @@ class _MainScreenState extends State<MainScreen> {
     _screens = [
       HomeScreen(),
       CartScreen(),
-      ProfileScreen(userId: widget.userId), // Passing the userId here
+      ProfileViewScreen(userId: widget.userId), // Passing the userId here
     ];
   }
 
@@ -50,11 +47,20 @@ class _MainScreenState extends State<MainScreen> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: 'Profile', // Adding label for Profile
+            label: 'Profile',
           ),
         ],
         currentIndex: _selectedIndex,
+        selectedItemColor: Colors.blue,
+        unselectedItemColor: Colors.grey,
+        showUnselectedLabels: false,
+        type: BottomNavigationBarType.fixed,
         onTap: _onItemTapped,
+        backgroundColor: Colors.white,
+        elevation: 10,
+        selectedLabelStyle: TextStyle(fontWeight: FontWeight.bold),
+        selectedIconTheme: IconThemeData(size: 30),
+        unselectedIconTheme: IconThemeData(size: 24),
       ),
     );
   }

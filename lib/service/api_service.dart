@@ -24,10 +24,13 @@ class ApiService {
   }
 
   Future<bool> updateUserProfile(
-      String userId, Map<String, dynamic> updatedData) async {
+    String userId,
+    Map<String, dynamic> updatedData,
+  ) async {
     try {
       final response = await http.put(
-        Uri.parse('$baseUrl/User/$userId'), // Ensure this matches your API
+        Uri.parse(
+            '$baseUrl/User/$userId'), // Correct endpoint for user profile update
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(updatedData),
       );
@@ -51,23 +54,55 @@ class ApiService {
       final request = http.MultipartRequest(
           'POST', Uri.parse('$baseUrl/User/$userId/upload-image'));
 
-      request.fields['userId'] = userId;
       request.files
           .add(await http.MultipartFile.fromPath('image', imageFile.path));
 
       final response = await request.send();
-
       if (response.statusCode == 200) {
-        return true; // Success
+        return true; // Upload successful
       } else {
-        final responseBody = await response.stream.bytesToString();
-        print(
-            'Upload failed with status: ${response.statusCode}, body: $responseBody');
-        return false; // Failed
+        print('Failed to upload image: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error uploading image: $e');
+      print('Error uploading profile image: $e');
+    }
+    return false; // Upload failed
+  }
+
+  Future<bool> changePassword(
+      String userId, String oldPassword, String newPassword) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/User/$userId/change-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(
+            {'oldPassword': oldPassword, 'newPassword': newPassword}),
+      );
+
+      return response.statusCode == 200; // Return true if update is successful
+    } catch (e) {
+      print('Error changing password: $e');
       return false; // Return false on error
+    }
+  }
+
+  Future<bool> deleteAccount(String userId, String password) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/User/$userId/delete-account'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'password': password}),
+      );
+
+      if (response.statusCode == 200) {
+        return true; // Account deletion successful
+      } else {
+        print('Failed to delete account: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('Error deleting account: $e');
+      return false;
     }
   }
 }
