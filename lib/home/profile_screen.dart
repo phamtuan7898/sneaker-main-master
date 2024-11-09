@@ -49,20 +49,21 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Please enter your password to confirm account deletion:',
-                  style: TextStyle(color: Colors.grey[700])),
+              Text('Please enter your password to confirm account deletion:'),
               TextField(
                 controller: _passwordController,
                 obscureText: true,
                 decoration: InputDecoration(
-                    labelText: 'Password', border: OutlineInputBorder()),
+                  labelText: 'Password',
+                  border: OutlineInputBorder(),
+                ),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+              child: Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
@@ -70,18 +71,20 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                   widget.userId,
                   _passwordController.text,
                 );
+
                 Navigator.pop(context);
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Account deleted successfully.')),
+                    SnackBar(content: Text('Account deleted successfully')),
                   );
+                  // Navigate to login screen and clear navigation stack
                   Navigator.of(context).pushNamedAndRemoveUntil(
                     '/login',
                     (Route<dynamic> route) => false,
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to delete account.')),
+                    SnackBar(content: Text('Failed to delete account')),
                   );
                 }
               },

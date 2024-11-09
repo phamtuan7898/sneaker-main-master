@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sneaker/models/user_model.dart';
 
 class ApiService {
-  final String baseUrl =
-      'http://192.168.1.7:5002'; // Replace with your server URL
+  final String baseUrl = 'http://192.168.1.4:5002';
 
   Future<UserModel?> getUserProfile(String userId) async {
     try {
@@ -95,11 +95,14 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        return true; // Account deletion successful
-      } else {
-        print('Failed to delete account: ${response.statusCode}');
-        return false;
+        // Clear local storage
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.clear();
+        return true;
       }
+
+      print('Failed to delete account: ${response.statusCode}');
+      return false;
     } catch (e) {
       print('Error deleting account: $e');
       return false;

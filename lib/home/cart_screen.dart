@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sneaker/models/carts_model.dart';
+import 'package:sneaker/service/auth_service%20.dart';
 import 'package:sneaker/service/cart_service.dart';
+import 'package:sneaker/models/user_model.dart';
 
 class CartScreen extends StatefulWidget {
   @override
@@ -11,67 +13,164 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   List<CartItem> cartItems = [];
   final CartService _cartService = CartService();
+  UserModel? currentUser;
+  bool isLoading = true;
+  bool isUpdating = false;
+  final NumberFormat currencyFormatter = NumberFormat.currency(
+    locale: 'vi_VN',
+    symbol: 'VND',
+    decimalDigits: 0,
+  );
 
-  // Exchange rate between USD and VND
+  // Helper method to parse price string to double
+  double parsePrice(String price) {
+    // Remove currency symbol, commas and spaces
+    String cleanPrice = price.replaceAll(RegExp(r'[^\d]'), '');
+    return double.parse(cleanPrice);
+  }
 
+  // Rest of the initialization and user management methods remain the same...
   @override
   void initState() {
     super.initState();
-    fetchCartItems();
+    _initializeUser();
+  }
+
+  Future<void> _initializeUser() async {
+    try {
+      final user = await AuthService().getCurrentUser();
+      setState(() {
+        currentUser = user;
+        isLoading = false;
+      });
+      if (user != null) {
+        await fetchCartItems();
+      }
+    } catch (e) {
+      print('Error getting current user: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   Future<void> fetchCartItems() async {
+    if (currentUser == null) return;
+
     try {
-      final items = await _cartService.fetchCartItems();
+      final items = await _cartService.fetchCartItems(currentUser!.id);
       setState(() {
         cartItems = items;
       });
     } catch (e) {
       print('Error fetching cart items: $e');
+      _showErrorMessage('Không thể tải giỏ hàng');
     }
   }
 
-  void _removeCartItem(CartItem item) async {
-    try {
-      await _cartService.removeCartItem(item.id);
-      setState(() {
-        cartItems.remove(item);
-      });
-    } catch (e) {
-      print('Error removing cart item: $e');
-    }
-  }
+  Future<void> _updateQuantity(CartItem item, int newQuantity) async {
+    if (currentUser == null || isUpdating) return;
 
-  void _updateQuantity(CartItem item, int newQuantity) async {
+    if (newQuantity < 1) {
+      _showErrorMessage('Số lượng không thể nhỏ hơn 1');
+      return;
+    }
+
+    setState(() {
+      isUpdating = true;
+    });
+
     try {
+      // Sử dụng item.productId thay vì item.id
       await _cartService.updateCartItemQuantity(
-          item.id, newQuantity); // Update in MongoDB
+        currentUser!.id,
+        item.productId,
+        newQuantity,
+      );
+
       setState(() {
-        item.quantity = newQuantity; // Update locally
+        final index = cartItems.indexWhere((i) => i.id == item.id);
+        if (index != -1) {
+          cartItems[index].quantity = newQuantity;
+        }
       });
+
+      _showSuccessMessage('Đã cập nhật số lượng');
     } catch (e) {
       print('Error updating cart item quantity: $e');
+      _showErrorMessage('Không thể cập nhật số lượng');
+      // Khôi phục lại số lượng cũ nếu cập nhật thất bại
+      setState(() {
+        final index = cartItems.indexWhere((i) => i.id == item.id);
+        if (index != -1) {
+          cartItems[index].quantity = item.quantity;
+        }
+      });
+    } finally {
+      setState(() {
+        isUpdating = false;
+      });
     }
   }
 
-  double getTotalPriceInVND() {
-    return cartItems.fold(
-      0.0,
-      (total, item) => total + (item.getTotalPrice() * item.quantity),
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
     );
   }
 
-  String formatCurrency(double amount) {
-    final formatter = NumberFormat.currency(
-      locale: 'vi_VN', // Vietnamese locale
-      symbol: 'VND', // Currency symbol
-      decimalDigits: 0, // No decimal places for currency
+  void _showSuccessMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+      ),
     );
-    return formatter.format(amount);
+  }
+
+  Widget _buildQuantityControls(CartItem item) {
+    return Row(
+      children: [
+        IconButton(
+          icon: Icon(Icons.remove_circle_outline),
+          color: Colors.red,
+          onPressed: isUpdating
+              ? null
+              : () => _updateQuantity(item, item.quantity - 1),
+        ),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            item.quantity.toString(),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        IconButton(
+          icon: Icon(Icons.add_circle_outline),
+          color: Colors.green,
+          onPressed: isUpdating
+              ? null
+              : () => _updateQuantity(item, item.quantity + 1),
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: Text('GIỎ HÀNG')),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -105,41 +204,32 @@ class _CartScreenState extends State<CartScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(item.productName,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.productName,
                                 style: TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.bold)),
-                            SizedBox(height: 4),
-                            Text('Giá: ${item.price.toString()}',
+                                    fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Giá: ${currencyFormatter.format(parsePrice(item.price))}',
                                 style: TextStyle(
-                                    fontSize: 18,
-                                    color: Colors
-                                        .blueAccent)), // Ensure item.price is double
-                          ],
+                                    fontSize: 16, color: Colors.blueAccent),
+                              ),
+                            ],
+                          ),
                         ),
-                        Row(
+                        Column(
                           children: [
-                            IconButton(
-                              icon: Icon(Icons.remove, color: Colors.red),
-                              onPressed: () {
-                                if (item.quantity > 1) {
-                                  _updateQuantity(item, item.quantity - 1);
-                                }
-                              },
-                            ),
-                            Text(item.quantity.toString(),
-                                style: TextStyle(fontSize: 18)),
-                            IconButton(
-                              icon: Icon(Icons.add, color: Colors.green),
-                              onPressed: () {
-                                _updateQuantity(item, item.quantity + 1);
-                              },
-                            ),
+                            _buildQuantityControls(item),
                             IconButton(
                               icon: Icon(Icons.delete, color: Colors.grey),
-                              onPressed: () => _removeCartItem(item),
+                              onPressed: isUpdating
+                                  ? null
+                                  : () => _removeCartItem(item),
                             ),
                           ],
                         ),
@@ -153,11 +243,34 @@ class _CartScreenState extends State<CartScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Text(
-            'Tổng: ${formatCurrency(getTotalPriceInVND())}', // Format the total price
+            'Tổng: ${currencyFormatter.format(getTotalPriceInVND())}',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _removeCartItem(CartItem item) async {
+    if (currentUser == null) return;
+
+    try {
+      // Sử dụng item.productId thay vì item.id
+      await _cartService.removeCartItem(currentUser!.id, item.productId);
+      setState(() {
+        cartItems.remove(item);
+      });
+      _showSuccessMessage('Đã xóa sản phẩm khỏi giỏ hàng');
+    } catch (e) {
+      print('Error removing cart item: $e');
+      _showErrorMessage('Không thể xóa sản phẩm');
+    }
+  }
+
+  double getTotalPriceInVND() {
+    return cartItems.fold(
+      0.0,
+      (total, item) => total + (parsePrice(item.price) * item.quantity),
     );
   }
 }

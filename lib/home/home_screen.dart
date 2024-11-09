@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:sneaker/models/products_model.dart';
 import 'package:sneaker/product_screen/product_detail.dart';
 import 'package:sneaker/screen/search_screen.dart';
+import 'package:sneaker/service/auth_service%20.dart';
 import 'package:sneaker/service/product_service.dart';
+import 'package:sneaker/models/user_model.dart'; // Add this import
 import 'dart:async';
 
 class HomeScreen extends StatefulWidget {
@@ -14,12 +16,14 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<List<ProductModel>> _productsFuture;
   late PageController _pageController;
   Timer? _timer;
+  UserModel? currentUser; // Add this
 
   @override
   void initState() {
     super.initState();
     _productsFuture = ProductService().fetchProducts();
     _pageController = PageController();
+    _initializeUser(); // Add this
 
     // Set up Timer to change page automatically
     _timer = Timer.periodic(Duration(seconds: 3), (timer) {
@@ -30,6 +34,18 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     });
+  }
+
+  // Add this method
+  Future<void> _initializeUser() async {
+    try {
+      final user = await AuthService().getCurrentUser();
+      setState(() {
+        currentUser = user;
+      });
+    } catch (e) {
+      print('Error getting current user: $e');
+    }
   }
 
   @override
@@ -64,7 +80,6 @@ class _HomeScreenState extends State<HomeScreen> {
               color: Colors.white,
             ),
             onPressed: () {
-              // Navigate to SearchScreen
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => SearchScreen()),
@@ -106,15 +121,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCategoryTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.black,
+  // Update the navigation methods to pass the user parameter
+  void _navigateToProductDetail(ProductModel product) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductDetail(
+          product: product,
+          user: currentUser, // Pass the current user
         ),
       ),
     );
@@ -125,13 +139,13 @@ class _HomeScreenState extends State<HomeScreen> {
       final price = int.tryParse(p.price.replaceAll(RegExp(r'[^\d]'), ''));
       return price != null && price < 3500000;
     }).toList();
-    if (promotionsProducts.isEmpty) {
-      return Container();
-    }
+    if (promotionsProducts.isEmpty) return Container();
+
     final infiniteList = List.generate(
       1000,
       (index) => promotionsProducts[index % promotionsProducts.length],
     );
+
     return Container(
       height: 200,
       child: PageView.builder(
@@ -140,14 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, index) {
           final product = infiniteList[index];
           return GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProductDetail(product: product),
-                ),
-              );
-            },
+            onTap: () => _navigateToProductDetail(product),
             child: _buildPromotionCard(product),
           );
         },
@@ -155,7 +162,61 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildCategorySection(List<ProductModel> products, String category) {
+    final categoryProducts =
+        products.where((p) => p.shoeType == category).toList();
+    if (categoryProducts.isEmpty) {
+      return Container(
+        height: 200,
+        child: const Center(
+            child: Text('Không có sản phẩm nào trong danh mục này.')),
+      );
+    }
+
+    return Container(
+      height: 200,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: categoryProducts.length,
+        itemBuilder: (context, index) {
+          final product = categoryProducts[index];
+          return GestureDetector(
+            onTap: () => _navigateToProductDetail(product),
+            child: _buildCategoryCard(product),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHighlightedSection(List<ProductModel> products) {
+    final highlightedProducts = products.where((p) => p.rating >= 4.5).toList();
+    return _buildHorizontalProductList(highlightedProducts);
+  }
+
+  Widget _buildHorizontalProductList(List<ProductModel> products) {
+    if (products.isEmpty) {
+      return const Center(child: Text('Không có sản phẩm nổi bật.'));
+    }
+
+    return Container(
+      height: 200,
+      child: PageView.builder(
+        itemCount: products.length,
+        itemBuilder: (context, index) {
+          final product = products[index];
+          return GestureDetector(
+            onTap: () => _navigateToProductDetail(product),
+            child: _buildHighlightedCard(product),
+          );
+        },
+      ),
+    );
+  }
+
+  // Rest of your widget building methods remain the same
   Widget _buildPromotionCard(ProductModel product) {
+    // Implementation remains the same
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
@@ -187,39 +248,6 @@ class _HomeScreenState extends State<HomeScreen> {
           product.productName,
           style: const TextStyle(color: Colors.white, fontSize: 16),
         ),
-      ),
-    );
-  }
-
-  Widget _buildCategorySection(List<ProductModel> products, String category) {
-    final categoryProducts =
-        products.where((p) => p.shoeType == category).toList();
-    if (categoryProducts.isEmpty) {
-      return Container(
-        height: 200,
-        child: const Center(
-            child: Text('Không có sản phẩm nào trong danh mục này.')),
-      );
-    }
-    return Container(
-      height: 200,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: categoryProducts.length,
-        itemBuilder: (context, index) {
-          final product = categoryProducts[index];
-          return GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProductDetail(product: product),
-                ),
-              );
-            },
-            child: _buildCategoryCard(product),
-          );
-        },
       ),
     );
   }
@@ -267,37 +295,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHighlightedSection(List<ProductModel> products) {
-    final highlightedProducts = products.where((p) => p.rating >= 4.5).toList();
-    return _buildHorizontalProductList(highlightedProducts);
-  }
-
-  Widget _buildHorizontalProductList(List<ProductModel> products) {
-    if (products.isEmpty) {
-      return const Center(child: Text('Không có sản phẩm nổi bật.'));
-    }
-    return Container(
-      height: 200,
-      child: PageView.builder(
-        itemCount: products.length,
-        itemBuilder: (context, index) {
-          final product = products[index];
-          return GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProductDetail(product: product),
-                ),
-              );
-            },
-            child: _buildHighlightedCard(product),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildHighlightedCard(ProductModel product) {
     return Card(
       elevation: 4,
@@ -331,6 +328,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
+        ),
       ),
     );
   }

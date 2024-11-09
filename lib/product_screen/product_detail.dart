@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:sneaker/models/carts_model.dart';
 import 'package:sneaker/models/products_model.dart';
+import 'package:sneaker/models/user_model.dart';
+import 'package:sneaker/service/cart_service.dart';
+
+import 'package:flutter/material.dart';
+import 'package:sneaker/models/carts_model.dart';
+import 'package:sneaker/models/products_model.dart';
+import 'package:sneaker/models/user_model.dart';
 import 'package:sneaker/service/cart_service.dart';
 
 class ProductDetail extends StatelessWidget {
   final ProductModel product;
-  ProductDetail({required this.product});
+  final UserModel? user; // Make user parameter nullable
+
+  ProductDetail({
+    required this.product,
+    required this.user,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -194,11 +206,26 @@ class ProductDetail extends StatelessWidget {
         ),
         child: ElevatedButton(
           onPressed: () {
-            _showQuantityDialog(context);
+            if (user != null) {
+              _showQuantityDialog(context);
+            } else {
+              // Show login dialog or navigate to login screen
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Vui lòng đăng nhập để thêm vào giỏ hàng'),
+                  action: SnackBarAction(
+                    label: 'Đăng nhập',
+                    onPressed: () {
+                      // Navigate to login screen
+                      // Navigator.pushNamed(context, '/login');
+                    },
+                  ),
+                ),
+              );
+            }
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor:
-                Colors.transparent, // Ensure the gradient is visible
+            backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
             padding: EdgeInsets.symmetric(vertical: 15),
             textStyle: TextStyle(fontSize: 18),
@@ -216,68 +243,74 @@ class ProductDetail extends StatelessWidget {
   }
 
   void _showQuantityDialog(BuildContext context) {
+    if (user == null) return; // Early return if no user
+
     int quantity = 1;
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('Chọn số lượng'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.remove),
-                    onPressed: () {
-                      if (quantity > 1) {
-                        quantity--;
-                        (context as Element).markNeedsBuild();
-                      }
-                    },
-                  ),
-                  Text(
-                    '$quantity',
-                    style: TextStyle(fontSize: 24),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.add),
-                    onPressed: () {
-                      quantity++;
-                      (context as Element).markNeedsBuild();
-                    },
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.remove),
+                        onPressed: () {
+                          if (quantity > 1) {
+                            setState(() => quantity--);
+                          }
+                        },
+                      ),
+                      Text(
+                        '$quantity',
+                        style: TextStyle(fontSize: 24),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.add),
+                        onPressed: () {
+                          setState(() => quantity++);
+                        },
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ],
+              );
+            },
           ),
           actions: <Widget>[
             TextButton(
               child: Text('Hủy'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
               child: Text('Thêm'),
               onPressed: () async {
                 CartItem cartItem = CartItem(
-                  id: product.id,
+                  id: '', // MongoDB will generate this
+                  userId: user!.id, // Safe to use ! here as we checked above
+                  productId: product.id,
                   productName: product.productName,
                   price: product.price,
                   quantity: quantity,
                 );
+
                 try {
-                  await CartService().addCartItem(cartItem);
+                  await CartService().addCartItem(user!.id, cartItem);
+                  Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
                           '${product.productName} đã được thêm vào giỏ hàng!'),
                     ),
                   );
-                  Navigator.of(context).pop();
                 } catch (e) {
+                  Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Không thể thêm sản phẩm vào giỏ hàng.'),

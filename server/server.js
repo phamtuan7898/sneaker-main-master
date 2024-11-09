@@ -47,15 +47,130 @@ const productSchema = new mongoose.Schema({
 
 // Cart Schema
 const cartItemSchema = new mongoose.Schema({
-  id: { type: String, required: true }, // Product ID
-  productName: { type: String, required: true },
-  price: { type: String, required: true },
-  quantity: { type: Number, required: true, default: 1 },
+  userId: { 
+    type: String,  // Changed from ObjectId to String for flexibility
+    required: true 
+  },
+  productId: { 
+    type: String, 
+    required: true 
+  },
+  productName: { 
+    type: String, 
+    required: true 
+  },
+  price: { 
+    type: String, 
+    required: true 
+  },
+  quantity: { 
+    type: Number, 
+    required: true,
+    default: 1,
+    min: 1
+  }
+});
+// Admin Schema
+const adminSchema = new mongoose.Schema({
+  adminname: { 
+    type: String, 
+    required: true,
+    unique: true
+  },
+  adminpass: { 
+    type: String, 
+    required: true 
+  }
 });
 
+const Admin = mongoose.model('Admin', adminSchema);
 const CartItem = mongoose.model('CartItem', cartItemSchema);
 const Product = mongoose.model('Product', productSchema);
 const User = mongoose.model('User', userSchema);
+
+// Admin login
+app.post('/admin/login', async (req, res) => {
+  const { adminname, adminpass } = req.body;
+  
+  try {
+    const admin = await Admin.findOne({ adminname });
+    
+    if (!admin || admin.adminpass !== adminpass) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    res.json({ message: 'Login successful', adminId: admin._id });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Get all admins
+app.get('/admin', async (req, res) => {
+  try {
+    const admins = await Admin.find({}, { adminpass: 0 }); // Exclude password from response
+    res.json(admins);
+  } catch (error) {
+    console.error('Error fetching admins:', error);
+    res.status(500).json({ error: 'Error fetching admins' });
+  }
+});
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/'); // Thư mục lưu file
+  },
+  filename: (req, file, cb) => {
+    // Tạo tên file duy nhất với timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+// Cấu hình filter cho file
+const fileFilter = (req, file, cb) => {
+  // Chỉ chấp nhận file ảnh
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Not an image! Please upload only images.'), false);
+  }
+};
+const uploads = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // Giới hạn 5MB
+  }
+});
+// Thêm route xử lý upload nhiều ảnh
+app.post('/uploads-images', upload.array('images', 5), async (req, res) => {
+  try {
+    const files = req.files;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'No files uploaded' 
+      });
+    }
+
+    // Create array of image URLs
+    const imageUrls = files.map(file => 
+      `${req.protocol}://${req.get('host')}/uploads/${file.filename}`
+    );
+    
+    res.status(200).json({
+      success: true,
+      imageUrls: imageUrls  // Changed from urls to imageUrls to match client expectation
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error uploading files'
+    });
+  }
+});
 
 // Register User
 app.post('/register', async (req, res) => {
@@ -221,20 +336,35 @@ app.delete('/User/:id/delete-account', async (req, res) => {
   const { password } = req.body;
 
   try {
-    const user = await User.findById(id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    // Start a MongoDB session for transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // 1. Find and verify user
+      const user = await User.findById(id).session(session);
+      if (!user || user.password !== password) {
+        await session.abortTransaction();
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      // 2. Delete all cart items for this user
+      await CartItem.deleteMany({ userId: id }).session(session);
+
+      // 3. Delete the user account
+      await User.findByIdAndDelete(id).session(session);
+
+      // 4. Commit the transaction
+      await session.commitTransaction();
+      return res.status(200).json({ message: 'Account deleted successfully' });
+
+    } catch (error) {
+      // If any error occurs, abort the transaction
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
     }
-
-    // Check if the provided password matches
-    if (user.password !== password) {
-      return res.status(401).json({ message: 'Incorrect password' });
-    }
-
-    // Delete the user from the database
-    await User.findByIdAndDelete(id);
-
-    return res.status(200).json({ message: 'Account deleted successfully' });
   } catch (error) {
     console.error('Error deleting account:', error);
     return res.status(500).json({ error: 'Error deleting account' });
@@ -249,12 +379,12 @@ app.post('/products', async (req, res) => {
     const newProduct = new Product({ 
       productName, 
       shoeType, 
-      image,  // Now accepting array of image URLs
+      image,
       price, 
       rating, 
       description, 
-      color,  // Now accepting array of colors
-      size    // Now accepting array of sizes
+      color,
+      size
     });
     await newProduct.save();
     res.status(201).json(newProduct);
@@ -263,6 +393,7 @@ app.post('/products', async (req, res) => {
     res.status(500).json({ error: 'Error adding product' });
   }
 });
+
 
 // Get list of products
 app.get('/products', async (req, res) => {
@@ -275,23 +406,99 @@ app.get('/products', async (req, res) => {
   }
 });
 
+// Trong file app.js
+app.delete('/products/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Tìm và xoá sản phẩm
+    await Product.findByIdAndDelete(id);
+    res.status(200).json({ message: 'Sản phẩm đã được xoá thành công' });
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    res.status(500).json({ error: 'Error deleting product' });
+  }
+});
+// Add this endpoint to your Express server code
+app.put('/product/update/:id', async (req, res) => {
+  const { id } = req.params;
+  const { 
+    productName, 
+    shoeType, 
+    image, 
+    price, 
+    rating, 
+    description, 
+    color, 
+    size 
+  } = req.body;
+
+  try {
+    const updatedProduct = await Product.findByIdAndUpdate(
+      id,
+      {
+        productName,
+        shoeType,
+        image,
+        price,
+        rating,
+        description,
+        color,
+        size
+      },
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedProduct) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    res.status(200).json(updatedProduct);
+  } catch (error) {
+    console.error('Error updating product:', error);
+    res.status(500).json({ error: 'Error updating product' });
+  }
+});
 // Add new cart item
 app.post('/cart', async (req, res) => {
-  const { id, productName, price, quantity } = req.body;
+  const { userId, productId, productName, price, quantity } = req.body;
+  
   try {
-    const newCartItem = new CartItem({ id, productName, price, quantity });
-    await newCartItem.save();
-    res.status(201).json(newCartItem);
+    // Check if item already exists in user's cart
+    const existingItem = await CartItem.findOne({ 
+      userId: userId,
+      productId: productId 
+    });
+
+    if (existingItem) {
+      // Update quantity if item exists
+      existingItem.quantity += quantity;
+      await existingItem.save();
+      res.status(200).json(existingItem);
+    } else {
+      // Create new cart item if doesn't exist
+      const newCartItem = new CartItem({
+        userId,
+        productId,
+        productName,
+        price,
+        quantity
+      });
+      await newCartItem.save();
+      res.status(201).json(newCartItem);
+    }
   } catch (error) {
     console.error('Error adding cart item:', error);
     res.status(500).json({ error: 'Error adding cart item' });
   }
 });
 
+
 // Get list of cart items
-app.get('/cart', async (req, res) => {
+app.get('/cart/:userId', async (req, res) => {
+  const { userId } = req.params;
+  
   try {
-    const cartItems = await CartItem.find();
+    const cartItems = await CartItem.find({ userId: userId });
     res.json(cartItems);
   } catch (error) {
     console.error('Error fetching cart items:', error);
@@ -300,15 +507,20 @@ app.get('/cart', async (req, res) => {
 });
 
 // Delete cart item
-app.delete('/cart/:id', async (req, res) => {
-  const { id } = req.params;
+app.delete('/cart/:userId/:productId', async (req, res) => {
+  const { userId, productId } = req.params;
+  
   try {
-    const result = await CartItem.findOneAndDelete({ id });
-    if (result) {
-      res.status(200).json({ message: 'Cart item deleted successfully' });
-    } else {
-      res.status(404).json({ message: 'Cart item not found' });
+    const result = await CartItem.findOneAndDelete({
+      userId: userId,
+      productId: productId
+    });
+    
+    if (!result) {
+      return res.status(404).json({ message: 'Cart item not found' });
     }
+    
+    res.json({ message: 'Cart item deleted successfully' });
   } catch (error) {
     console.error('Error deleting cart item:', error);
     res.status(500).json({ error: 'Error deleting cart item' });
@@ -316,25 +528,45 @@ app.delete('/cart/:id', async (req, res) => {
 });
 
 // Update cart item quantity
-app.put('/cart/:id', async (req, res) => {
-  const { id } = req.params;
-  const { quantity } = req.body; // Expecting the new quantity in the request body
+app.put('/cart/:userId/:productId', async (req, res) => {
+  const { userId, productId } = req.params;
+  const { quantity } = req.body;
+  
+  if (!quantity || quantity < 1) {
+    return res.status(400).json({ message: 'Invalid quantity value' });
+  }
+
   try {
-    const updatedCartItem = await CartItem.findOneAndUpdate(
-      { id }, // Filter by id
-      { quantity }, // Update quantity
-      { new: true } // Return the updated document
+    console.log(`Updating cart item: userId=${userId}, productId=${productId}, quantity=${quantity}`);
+    
+    const updatedItem = await CartItem.findOneAndUpdate(
+      { 
+        userId: userId.toString(),
+        productId: productId.toString()
+      },
+      { quantity: quantity },
+      { new: true }
     );
-    if (updatedCartItem) {
-      res.status(200).json(updatedCartItem);
-    } else {
-      res.status(404).json({ message: 'Cart item not found' });
+    
+    if (!updatedItem) {
+      console.log('Cart item not found with:', { userId, productId });
+      return res.status(404).json({ 
+        message: 'Cart item not found',
+        details: { userId, productId }
+      });
     }
+    
+    console.log('Successfully updated cart item:', updatedItem);
+    res.json(updatedItem);
   } catch (error) {
-    console.error('Error updating cart item quantity:', error);
-    res.status(500).json({ error: 'Error updating cart item quantity' });
+    console.error('Error updating cart item:', error);
+    res.status(500).json({ 
+      error: 'Error updating cart item',
+      details: error.message 
+    });
   }
 });
+
 
 // Start the server
 app.listen(PORT, () => {

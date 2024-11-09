@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:sneaker/models/products_model.dart';
+import 'package:sneaker/models/user_model.dart';
 import 'package:sneaker/product_screen/product_detail.dart';
+import 'package:sneaker/service/auth_service%20.dart';
 import 'package:sneaker/service/product_service.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -12,11 +14,24 @@ class _SearchScreenState extends State<SearchScreen> {
   List<ProductModel> _products = [];
   List<ProductModel> _filteredProducts = [];
   TextEditingController _searchController = TextEditingController();
+  UserModel? currentUser;
 
   @override
   void initState() {
     super.initState();
     _fetchProducts();
+    _initializeUser();
+  }
+
+  Future<void> _initializeUser() async {
+    try {
+      final user = await AuthService().getCurrentUser();
+      setState(() {
+        currentUser = user;
+      });
+    } catch (e) {
+      print('Error getting current user: $e');
+    }
   }
 
   Future<void> _fetchProducts() async {
@@ -89,8 +104,11 @@ class _SearchScreenState extends State<SearchScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        ProductDetail(product: product),
+                                    builder: (context) => ProductDetail(
+                                      product: product,
+                                      user:
+                                          currentUser, // Pass the current user
+                                    ),
                                   ),
                                 );
                               },

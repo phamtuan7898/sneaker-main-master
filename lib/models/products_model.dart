@@ -24,12 +24,15 @@ class ProductModel {
   // Factory method to create Shoe object from JSON
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     return ProductModel(
-      id: json['_id'] as String,
+      id: json['_id'] ?? '',
       productName: json['productName'] as String,
       shoeType: json['shoeType'] as String,
       image: List<String>.from(json['image']),
       price: json['price'] as String,
-      rating: json['rating'] as double,
+      // Xử lý trường rating để chấp nhận cả int và double
+      rating: (json['rating'] is int)
+          ? (json['rating'] as int).toDouble()
+          : json['rating'] as double,
       description: json['description'] as String,
       color: List<String>.from(json['color']),
       size: List<String>.from(json['size']),
